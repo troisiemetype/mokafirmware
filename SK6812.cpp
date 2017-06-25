@@ -21,10 +21,13 @@
  #include "SK6812.h"
 
 
-//led state
-//leds are numbered from 0 to 15, from left to right and from top to bottom
-//Each led has RGB value, arranged as GRB.
-//this table is ordered GRB, but I2C communication from mater uses RGB.
+// leds are numbered from 0 to 15, from left to right and from top to bottom
+// Each led has RGB value, arranged as GRB.
+// The table is ordered GRB so the data can be streamed raw, but setting methods use the classis RGB order.
+
+// Timer2 is used to end data bits to leds, via pin3 pwm (PORTD3, OCR2B).
+// It's disabled most of the time, only turned on when updating,
+// and turned off again when all bits have been shifted.
 
 const uint16_t topIndex = 384;
 uint8_t pwmTable[topIndex];
@@ -67,6 +70,12 @@ void SK6812::init(){
 
     //Set interrupt again;
     sei();
+
+    //Set the led data pin, output, default to 0;
+
+    DDRD |= _BV(DDD3);
+    PORTD &= ~(_BV(PORTD3));
+
 }
 
 //set led value with 6 bits-defined color

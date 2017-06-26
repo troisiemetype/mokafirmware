@@ -24,8 +24,18 @@
 #include <Arduino.h>
 
 void ml_init();
-void ml_setLed(uint8_t ledId, uint8_t color);
-void ml_setLed(uint8_t ledId, uint8_t rChannel, uint8_t gChannel, uint8_t bChannel);
+void ml_setColor(uint8_t ledId, uint8_t color);
+void ml_setColor(uint8_t ledId, uint8_t rChannel, uint8_t gChannel, uint8_t bChannel);
+
+void ml_setLed(uint16_t state);
+void ml_setLed(uint8_t ledId, bool state);
+void ml_setDisplayState(bool state);
+void ml_setBlinkState(bool state);
+
+void ml_setBlinkOnDelay(uint16_t delay);
+void ml_setBlinkOffDelay(uint16_t delay);
+
+void ml_clrLeds();
 
 uint32_t ml_getLed(uint8_t ledId);
 

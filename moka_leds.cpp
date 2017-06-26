@@ -29,11 +29,28 @@
 // It's disabled most of the time, only turned on when updating,
 // and turned off again when all bits have been shifted.
 
+//The top number when bit shifting. This is 16 leds * 3 colors * 8 bits
 const uint16_t _ml_top = 384;
 
-uint8_t _ml_ledState[16][3];
+//The table storing the current led color.
+uint8_t _ml_ledColor[16][3];
+//The table storing the timer value for each bit
 uint8_t _ml_pwmTable[_ml_top];
+//Led state, i.e. on or off: one bit per led
+uint16_t _ml_ledState = 0;
+
+//The current bit index when bitshifting
 volatile uint16_t _ml_current = 0;
+
+//The display state, i.e. if leds are lit or shut, independently of their respective values
+bool _ml_displayOn = false;
+
+//The blink state, i.e. if the display blinks
+bool _ml_displayBlink = false;
+bool _ml_currentBlink = false;
+
+uint16_t _ml_blinkOnDelay = 1000;
+uint16_t _ml_displayOffDelay = 1000;
 
 //Init the timer for led driving
 void ml_init(){
@@ -88,16 +105,16 @@ void ml_setLed(uint8_t ledId, uint8_t color){
 
 //Set led value with 8 bits value for R, G and B channels.
 void ml_setLed(uint8_t ledId, uint8_t rChannel, uint8_t gChannel, uint8_t bChannel){
-	_ml_ledState[ledId][0] = gChannel;
-	_ml_ledState[ledId][1] = rChannel;
-	_ml_ledState[ledId][2] = bChannel;
+	_ml_ledColor[ledId][0] = gChannel;
+	_ml_ledColor[ledId][1] = rChannel;
+	_ml_ledColor[ledId][2] = bChannel;
 }
 
 //Get led value on 24 bits
 uint32_t ml_getLed(uint8_t ledId){
-	uint8_t rChannel = _ml_ledState[ledId][1];
-	uint8_t gChannel = _ml_ledState[ledId][0];
-	uint8_t bChannel = _ml_ledState[ledId][2];
+	uint8_t rChannel = _ml_ledColor[ledId][1];
+	uint8_t gChannel = _ml_ledColor[ledId][0];
+	uint8_t bChannel = _ml_ledColor[ledId][2];
 	return (uint32_t)(((uint32_t)rChannel << 16) | ((uint32_t)gChannel << 8) | ((uint32_t)bChannel));	
 }
 
@@ -108,27 +125,47 @@ void ml_update(){
 
 	//A high state for a low bit is only 5 clock cycles.
 	//To save compute time during interrupt, each bit length is precomputed before turning the timer on.
-	for(uint8_t led = 0; led < 16; led++){
+	// If diplay is Off, or blink is On and current blink is Off, we send only zeros.
+	if(!_ml_displayOn || (_ml_displayBlink && !_ml_currentBlink)){
+		for(uint16_t index = 0; i < _ml_top; i++){
+			_ml_pwmTable[index] = 5;
+		}
+	// Else, we can send data corresponding to pixels
+	} else {
+		for(uint8_t led = 0; led < 16; led++){
+			//If led is on, we compute each bit length for bit shifting
+			if(_ml_ledState & _BV(led)){
+				for(uint8_t channel = 0; channel < 3; channel++){
+					
+					uint8_t index = channel + led * 3;
+					for(uint8_t bit = 0; bit < 8; bit++){
 
-		for(uint8_t channel = 0; channel < 3; channel++){
-			
-			uint8_t index = channel + led * 3;
-			for(uint8_t bit = 0; bit < 8; bit++){
+						if((_ml_ledColor[led][channel]) & (1 << bit) & ledState){
+							_ml_pwmTable[index + bit] = 10;
 
-				if((_ml_ledState[led][channel] && (1 << bit))){
-					_ml_pwmTable[index + bit] = 10;
-				} else {
-					_ml_pwmTable[index + bit] = 5;
+						} else {
+							_ml_pwmTable[index + bit] = 5;
+
+						}
+					}
+				}
+			//But if the led is independently turned Off, we directly set 0 for it.
+			} else {
+				for(uint8_t i = 0; i < 24; i++){
+							_ml_pwmTable[index + bit] = 5;					
 				}
 			}
 		}
 	}
 
+	//Timer is turned on (no prescaller), OCR2B pin is set high
 	PORTD |= _BV(PORTD3);
 	TCCR2B |= _BV(CS20);
 }
 
+//Timer COMPA interrupt
 ISR(TIMER2_COMPA_vect){
+	//Test current bit, stop the timer if bit shifting is finished, or load the next bit length in OCR2B
 	if(++_ml_current == _ml_top){
 		TCCR2B &= ~(_BV(CS20));
 		PORTD &= ~(_BV(PORTD3));
@@ -136,3 +173,45 @@ ISR(TIMER2_COMPA_vect){
 		OCR2B = _ml_pwmTable[_ml_current];
 	}
 }
+
+// Set led states for a 16 bit int, each bit beeing a led
+void ml_setLed(uint16_t state){
+	_ml_ledState = state;
+}
+
+// Set led state for one led
+void ml_setLed(uint8_t ledId, bool state){
+	if(state){
+		_ml_ledState |= ledId;
+	} else {
+		_ml_ledState &= ~(ledId);
+	}
+}
+
+// Set the diplay state (turned on or off)
+void ml_setDisplayState(bool state){
+	_ml_displayOn = state;
+}
+
+// Set the blink state (turned on or off)
+void ml_setBlinkState(bool state){
+	_ml_displayBlink = state;
+}
+
+//Set the duration of the on state when blinking
+void ml_setBlinkOnDelay(uint16_t delay){
+	_ml_blinkOnDelay = delay;
+}
+
+//Set the duration of the off state when blinking
+void ml_setBlinkOffDelay(uint16_t delay){
+	_ml_blinkOffDelay = delay;
+}
+
+//Clear all leds (each channel of each led is set to 0)
+void ml_clrLeds(){
+	for(uint8_t i = 0; i < 16; i++){
+		ml_setColor(i, 0, 0, 0);
+	}
+}
+

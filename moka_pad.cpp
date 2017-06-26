@@ -30,6 +30,8 @@ uint16_t _mp_pState;
 uint32_t _mp_time;
 uint16_t _mp_debounceDelay;
 
+bool _mp_int = false;
+
 void mp_init(){
 /*
  * PC0: button row 1 output, high.
@@ -72,6 +74,7 @@ bool mp_getButton(uint8_t button){
 //Get the values for the whole grid
 //The returned value is true when pushed.
 uint16_t mp_getButtons(){
+	_mp_int = false;
 	return ~_mp_state;
 }
 
@@ -97,6 +100,7 @@ bool mp_update(){
 	if((_mp_state != _mp_now) && ((millis() - _mp_time) > _mp_debounceDelay)){
 		_mp_pState = _mp_state;
 		_mp_state = _mp_now;
+		_mp_int = true;
 		return true;
 	}
 	return false;

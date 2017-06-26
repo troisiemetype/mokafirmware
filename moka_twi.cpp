@@ -30,63 +30,51 @@
  * followed by one or more data byte(s) from master to slave
  * A data request will be typically an instruction byte,
  * followed by one or more data byte(s) from slave to master.
- *
- * There are a certain amount of features to be implemented
- * System features:
- * Reset 								Reset
- * Debounce delay 						DebounceDelay + 1 byte
- * Leds ON 								DisplayState | (bool)state
- * Blink 								BlinkState | (bool)state
- * Blinking ON delay 					BlinkOnDelay + 2 bytes
- * Blinking OFF delay 					BlinkOffDelay + 2 bytes
- *
- * Led features:
- * Clear display 						ClrDisplay
- * Set a led color (8 bits)				SetLed8 | LedNumber + 1 byte
- * Set a led color (24 bits)			SetLed24 | LedNumber + 3 bytes
- * Set global color (8 bits)			SetColor8 + 1 byte
- * Set global color (24 bits)			SetColor24 + 3 bytes
- * Get a led color (8 bits)				GetLed8 | LedNumber + 1 byte to master
- * Get a led color (24 bits)			GetLed24 | LedNumber + 3 bytes to master
- * 
- * Button features:
- * Read button 							ReadButton | ButtonNumber + 1 byte to master
- * Read buttons							ReadButtons + 1 byte to master
  */
 
 //Led register
-const uint8_t SET_ONE_LED = 0x00;
-const uint8_t SET_ALL_LED = 0x40;
 
-const uint8_t COLOR_8 = 0x00;
-const uint8_t COLOR_24 = 0x10;
-
-const uint8_t OFF = 0x20;
-const uint8_t ON = 0x30;
-
-//Buttons register
-const uint8_t GET_BUTTON = 0x80;
-const uint8_t GET_BUTTONS = 0x90;
+const uint8_t SET_ONE_LED = 0x00;		// SET_ONE_LED | LedNumber + 1/3 bytes
+const uint8_t SET_GLOBAL_LED = 0x10;	// SET_GLOBAL + 1/3 bytes
+const uint8_t SET_ALL_LED = 0x20;		// SET_ALL + 16/72 bytes
+//const uint8_t GET_BUTTON = 0x30;		// GET_BUTTON | ButtonNumber + 1 byte from slave to master
+const uint8_t GET_BUTTONS = 0x40;		// GET_BUTTONS + 1 byte from slave to master
+const uint8_t LED_STATE = 0x50; 		// LED_STATE + 2 byte
 
 //System registers
-const uint8_t DISPLAY_STATE = 0xA0;
-const uint8_t BLINK_STATE = 0xA2;
-const uint8_t BLINK_ON_DELAY = 0xA4;
-const uint8_t BLINK_OFF_DELAY = 0xA5;
-const uint8_t DEBOUNCE_DELAY = 0xA6;
+const uint8_t DISPLAY_STATE = 0x60;		// DISPLAY_STATE | State
+const uint8_t BLINK_STATE = 0x70;		// BLINK_STATE | State
+const uint8_t BLINK_ON_DELAY = 0x80;	// BLINK_ON_DELAY + 2 bytes
+const uint8_t BLINK_OFF_DELAY = 0x81;	// BLINK_OFF_DELAY + 2 bytes
+const uint8_t DEBOUNCE_DELAY = 0x82;	// DEBOUNCE_DELAY + 1 byte
 
-const uint8_t HAS_CHANGED = 0xB0;		//Ask if INT was emmited
+const uint8_t HAS_CHANGED = 0x83;		// HAS_CHANGED + 1 byte from slave to master // INT emitted
 
-const uint8_t CLR_DISPLAY = 0xF0;
-const uint8_t UPDATE_LEDS = 0xF5;
+const uint8_t CLR_DISPLAY = 0xF0;		// CLR_DISPLAY
+const uint8_t UPDATE_LEDS = 0xF5;		// UPDATE_LEDS
 
-const uint8_t RESET = 0xFF;
+const uint8_t RESET = 0xFF;				// RESET
+
+//TWI states
+const uint8_t TWI_SEND_IDLE = 0;
+const uint8_t TWI_SEND_BUTTON = 0x10;
+const uint8_t TWI_SEND_BUTTONS = 0x20;
+const uint8_t TWI_SEND_INT = 3;
+
+uint8_t _mw_twiState = TWI_SEND_IDLE;
+
+//color mode
+const uint8_t COLOR_MODE_8 = 0;
+const uint8_t COLOR_MODE_24 = 1;
+
+uint8_t _mw_colorMode = COLOR_MODE_8;
 
 
 const uint8_t baseAddress = 10;
 uint8_t twiAddress = baseAddress;
 
 
+//WTI init function.
 void mw_init(){
     // Setting address pins
     // PB0: addr0: input pullup
@@ -113,14 +101,111 @@ void mw_init(){
 
     Wire.begin(twiAddress);
 
-    Wire.onReceived(mw_receiveHandler);
+    Wire.onReceive(mw_receiveHandler);
     Wire.onRequest(mw_requestHandler);
 }
 
 void mw_receiveHandler(uint8_t bytes){
+	uint8_t command = Wire.read();
+	uint8_t bytesToRead = 0;
+
+	if(_mw_colorMode == COLOR_MODE_8){
+		if(((command ^ SET_ONE_LED) & 0xF0) == 0){
+			uint8_t value = Wire.read();
+			_ml_setColor(command & 0x0F, value);
+
+		} else if(((command ^ SET_GLOBAL_LED) & 0xF0) == 0){
+			uint8_t value = Wire.read();
+			for(uint8_t i = 0; i < 16; i++){
+				_ml_setColor(i, value);				
+			}
+
+		} else if(((command ^ SET_ALL_LED) & 0xF0) == 0){
+			for(uint8_t i = 0; i < 16; i++){
+				uint8_t value = Wire.read();
+				_ml_setColor(i, value);				
+			}
+		}
+
+	} else if (_mw_colorMode == COLOR_MODE_24){
+		if(((command ^ SET_ONE_LED) & 0xF0) == 0){
+			uint8_t rValue = Wire.read();
+			uint8_t gValue = Wire.read();
+			uint8_t bValue = Wire.read();
+			_ml_setColor(command & 0x0F, rValue, gValue, bValue);
+
+		} else if(((command ^ SET_GLOBAL_LED) & 0xF0) == 0){
+			uint8_t rValue = Wire.read();
+			uint8_t gValue = Wire.read();
+			uint8_t bValue = Wire.read();
+			for(uint8_t i = 0; i < 16; i++){
+				_ml_setColor(i, rValue, gValue, bValue);				
+			}
+
+		} else if(((command ^ SET_ALL_LED) & 0xF0) == 0){
+			for(uint8_t i = 0; i < 16; i++){
+				uint8_t rValue = Wire.read();
+				uint8_t gValue = Wire.read();
+				uint8_t bValue = Wire.read();
+				_ml_setColor(i, rValue, gValue, bValue);				
+			}
+		}
+	}
+
+	 if(((command ^ GET_BUTTONS) & 0xF0) == 0){
+	 	_mw_twiState = TWI_SEND_BUTTONS;
+
+	} else if((command ^ LED_STATE) == 0){
+		uint8_t data = (uint16_t)(Wire.read() << 8);
+		data |= (uint16_t)Wire.read();
+		ml_setLed(data);
+
+	} else if(((command ^ DISPLAY_STATE) & 0xF0) == 0){
+		ml_setDisplayState(command & 0x01);
+
+	} else if(((command ^ BLINK_STATE) & 0xF0) == 0){
+		ml_setBlinkState(command & 0x01);
+
+	} else if((command ^ BLINK_ON_DELAY) == 0){
+		uint16_t delay = 0;
+		delay |= (uint16_t)(Wire.read() << 8);
+		delay |= (uint16_t)(Wire.read());
+		ml_etBlinkOnDelay(delay);
+
+	} else if((command ^ BLINK_OFF_DELAY) == 0){
+		uint16_t delay = 0;
+		delay |= (uint16_t)(Wire.read() << 8);
+		delay |= (uint16_t)(Wire.read());
+		ml_etBlinkOffDelay(delay);
+	} else if((command ^ DEBOUNCE_DELAY) == 0){
+		uint8_t delay = Wire.read();
+		mp_setDebounceDelay(delay);
+
+	} else if((command ^ HAS_CHANGED) == 0){
+		_mw_twiState = TWI_SEND_INT;
+	} else if((command ^ CLR_DISPLAY) == 0){
+		ml_clrLeds();
+	} else if((command ^ UPDATE_LEDS) == 0){
+		ml_update();
+	} else if((command ^ RESET) == 0){
+		//reset boad
+	}
 
 }
 
-void mw_requestHandler(){
+void mw_requestHandler(void){
+	switch _mw_twiState{
+		case TWI_SEND_BUTTON:
+			Wire.write(_mp_getButtons());
+			_mw_twiState = TWI_SEND_IDLE;
+			break;
+		case TWI_SEND_INT:
+			Wire.write(_mp_int);
+			_mp_int = 0;
+			_mw_twiState = TWI_SEND_IDLE;
+			break;
+		default:
+			break;
+	}
 
 }

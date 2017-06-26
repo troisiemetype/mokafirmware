@@ -20,7 +20,17 @@
 
 // Button state are stored as a 16 bits value, each bit beeing a button state.
 
-Pad::init(){
+#include "moka_pad.h"
+
+uint16_t _mp_now;
+uint16_t _mp_prev;
+uint16_t _mp_state;
+uint16_t _mp_pState;
+
+uint32_t _mp_time;
+uint16_t _mp_debounceDelay;
+
+void mp_init(){
 /*
  * PC0: button row 1 output, high.
  * PC1: button row 2 output, high.
@@ -38,55 +48,55 @@ Pad::init(){
 	DDRD &= ~(0xF0);
 	PORTD |= 0xF0;
 
-	_prev = 0;
-	_now = 0;
-	_state = 0;
-	_ptate = 0;
+	_mp_prev = 0;
+	_mp_now = 0;
+	_mp_state = 0;
+	_mp_pState = 0;
 
-	_time = millis();
-	_debounceDelay = 5;
+	_mp_time = millis();
+	_mp_debounceDelay = 5;
 
 }
 
 //set a cutom debounce delay. Defaut is 5ms.
-void Pad::setdebounceDelay(uint16_t debounce){
-	_debounceDelay = debounce;
+void mp_setDebounceDelay(uint16_t debounce){
+	_mp_debounceDelay = debounce;
 }
 
 //Get the value for a button
 //The returned value is true when pushed, i.e. pulled low.
-bool Pad::getButton(uint8_t button){
-	return ~(buttonState & _BV(button));
+bool mp_getButton(uint8_t button){
+	return ~(_mp_state & _BV(button));
 }
 
 //Get the values for the whole grid
 //The returned value is true when pushed.
-uint16_t Pad::getbuttons(){
-	return ~buttonState;
+uint16_t mp_getButtons(){
+	return ~_mp_state;
 }
 
 //update the pad reading. Debounce is applied to the whole pad, not a specific button.
-bool Pad::update(){
+bool mp_update(){
 
-	_prev = _now;
-	_now = 0;
+	_mp_prev = _mp_now;
+	_mp_now = 0;
 	for(uint8_t row = 0; row < 4; row++){
 		PORTC |= 0x0F;
 		//Buttons are active low, so the row to be read is turned low.
 		PORTC &= ~(_BV(row));
 		//Add a delay before reading?
 		uint8_t reading = (PIND & 0xF0) >> 4;
-		_now |= ((reading & 0x0F) << row);
+		_mp_now |= ((reading & 0x0F) << row);
 	}
 
-	if(_prev != _now){
-		_time = millis();
+	if(_mp_prev != _mp_now){
+		_mp_time = millis();
 		return false;
 	}
 
-	if((_state != _now) && ((millis() - _time) > _debounceDelay)){
-		_pState = _state;
-		_state = _now;
+	if((_mp_state != _mp_now) && ((millis() - _mp_time) > _mp_debounceDelay)){
+		_mp_pState = _mp_state;
+		_mp_state = _mp_now;
 		return true;
 	}
 	return false;

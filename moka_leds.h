@@ -1,7 +1,7 @@
-//Moka 4x4 buttons driver library
+//SK8612 driver library
 
 /*
- * This is a library for reading Moka buttons pad.
+ * This is a library for driving SK6812 addressable leds (aka Neopixels), using timer interrupts
  * Copyright 2017 - Pierre-Loup Martin / le labo du troisième
  *
  * This is free software: you can redistribute it and/or modify
@@ -18,33 +18,18 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef PAD_H
-#define PAD_H
+#ifndef MOKA_LEDS_H
+#define MOKA_LEDS_H
 
 #include <Arduino.h>
 
-class Pad{
-public:
-	init();
+void ml_init();
+void ml_setLed(uint8_t ledId, uint8_t color);
+void ml_setLed(uint8_t ledId, uint8_t rChannel, uint8_t gChannel, uint8_t bChannel);
 
-	void setDebounceDelay(uint16_t);
+uint32_t ml_getLed(uint8_t ledId);
 
-	bool getButton(uint8_t button);
-	uint16_t getButtons();
-
-	void update();
-
-
-private:
-	uint16_t _now;
-	uint16_t _prev;
-	uint16_t _state;
-	uint16_t _pState;
-
-	uint32_t _time;
-	uint16_t _debounceDelay;
-
-
-};
+void ml_update();
 
 #endif
+ 

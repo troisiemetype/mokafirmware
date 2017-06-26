@@ -18,7 +18,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
- #include "SK6812.h"
+ #include "moka_leds.h"
 
 
 // leds are numbered from 0 to 15, from left to right and from top to bottom
@@ -29,21 +29,14 @@
 // It's disabled most of the time, only turned on when updating,
 // and turned off again when all bits have been shifted.
 
-const uint16_t topIndex = 384;
-uint8_t pwmTable[topIndex];
-volatile uint16_t currentIndex = 0;
+const uint16_t _ml_top = 384;
 
-ISR(TIMER2_COMPA_vect){
-	if(++currentIndex == topIndex){
-		TCCR2B &= ~(_BV(CS20));
-		PORTD &= ~(_BV(PORTD3));
-	} else {
-		OCR2B = pwmTable[currentIndex];
-	}
-}
+uint8_t _ml_ledState[16][3];
+uint8_t _ml_pwmTable[_ml_top];
+volatile uint16_t _ml_current = 0;
 
 //Init the timer for led driving
-void SK6812::init(){
+void ml_init(){
 	//Disable interrupts when setting registers
     cli();
 
@@ -78,42 +71,40 @@ void SK6812::init(){
 
 }
 
-//set led value with 6 bits-defined color
-void SK6812::setLed(uint8_t ledId, uint8_t color){
-	uint8_t rChannel = (color & 0x00110000) * 85;
-	uint8_t gChannel = (color & 0x00001100) * 85;
-	uint8_t bChannel = (color & 0x00000011) * 85;
-	setLed(ledId, rChannel, gChannel, bChannel);
+// Set led value with 8 bits-defined color
+// color is 0xAARRGGBB, and is converted into 3-bytes color value before to be stored in led table
+// 1 offset on the alpha channel is for having 4 steps of luminosity.
+void ml_setLed(uint8_t ledId, uint8_t color){
+	uint8_t aChannel = ((color >> 6) & 0x03) + 1;
+	uint8_t rChannel = (color >> 4) & 0x03;
+	uint8_t gChannel = (color >> 2) & 0x03;
+	uint8_t bChannel = (color >> 0) & 0x03;
+	rChannel *= aChannel * 21;
+	gChannel *= aChannel * 21;
+	bChannel *= aChannel * 21;
+	ml_setLed(ledId, rChannel, gChannel, bChannel);
 
-}
-
-//Set led value with 24-bits defined color
-void SK6812::setLed(uint8_t ledId, uint32_t color){
-	uint8_t rChannel = (color >> 16);
-	uint8_t gChannel = (color >> 8);
-	uint8_t bChannel = color;
-	setLed(ledId, rChannel, gChannel, bChannel);
 }
 
 //Set led value with 8 bits value for R, G and B channels.
-void SK6812::setLed(uint8_t ledId, uint8_t rChannel, uint8_t gChannel, uint8_t bChannel){
-	ledState[ledId][0] = gChannel;
-	ledState[ledId][1] = rChannel;
-	ledState[ledId][2] = bChannel;
+void ml_setLed(uint8_t ledId, uint8_t rChannel, uint8_t gChannel, uint8_t bChannel){
+	_ml_ledState[ledId][0] = gChannel;
+	_ml_ledState[ledId][1] = rChannel;
+	_ml_ledState[ledId][2] = bChannel;
 }
 
 //Get led value on 24 bits
-uint32_t SK6812::getLed(uint8_t ledId){
-	uint8_t rChannel = ledState[ledId][1];
-	uint8_t gChannel = ledState[ledId][0];
-	uint8_t bChannel = ledState[ledId][2];
+uint32_t ml_getLed(uint8_t ledId){
+	uint8_t rChannel = _ml_ledState[ledId][1];
+	uint8_t gChannel = _ml_ledState[ledId][0];
+	uint8_t bChannel = _ml_ledState[ledId][2];
 	return (uint32_t)(((uint32_t)rChannel << 16) | ((uint32_t)gChannel << 8) | ((uint32_t)bChannel));	
 }
 
 //Update the 16 leds.
-void SK6812::update(){
+void ml_update(){
 	//Current index is incremented at each timer TOP
-	currentIndex = 0;
+	_ml_current = 0;
 
 	//A high state for a low bit is only 5 clock cycles.
 	//To save compute time during interrupt, each bit length is precomputed before turning the timer on.
@@ -124,10 +115,10 @@ void SK6812::update(){
 			uint8_t index = channel + led * 3;
 			for(uint8_t bit = 0; bit < 8; bit++){
 
-				if((ledState[led][channel] && (1 << bit))){
-					pwmTable[index + bit] = 10;
+				if((_ml_ledState[led][channel] && (1 << bit))){
+					_ml_pwmTable[index + bit] = 10;
 				} else {
-					pwmTable[index + bit] = 5;
+					_ml_pwmTable[index + bit] = 5;
 				}
 			}
 		}
@@ -135,4 +126,13 @@ void SK6812::update(){
 
 	PORTD |= _BV(PORTD3);
 	TCCR2B |= _BV(CS20);
+}
+
+ISR(TIMER2_COMPA_vect){
+	if(++_ml_current == _ml_top){
+		TCCR2B &= ~(_BV(CS20));
+		PORTD &= ~(_BV(PORTD3));
+	} else {
+		OCR2B = _ml_pwmTable[_ml_current];
+	}
 }

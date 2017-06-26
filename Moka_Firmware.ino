@@ -65,13 +65,9 @@
  */
 
 //includes
-#include "SK6812.h"
-#include "Pad.h"
-
-//instanciations of include objects
-SK6812 leds = SK6812();
-Pad pad = Pad();
-
+#include "moka_leds.h"
+#include "moka_pad.h"
+#include "moka_twi.h"
 
 //Constants definition
 const uint8_t nbLed = 16;
@@ -93,11 +89,12 @@ void setup(){
     */
 
     //Led timer setting
-    leds.init();
+    ml_init();
 
     //Pad setting
-    pad.init();
+    mp_init();
 
+    mw_init();
 
     //
     //Led init
@@ -105,7 +102,7 @@ void setup(){
 }
 
 void loop(){
-    pad.update();
+    mp_update();
     testRandomLed();
 
 }
@@ -113,9 +110,9 @@ void loop(){
 //Test function
 void testRandomLed(){
     for (uint8_t i = 0; i < 16; i++){
-        leds.setLed(i, random(256), random(256), random(256));
+        ml_setLed(i, random(256), random(256), random(256));
     }
-    leds.update();
+    ml_update();
 
     delay(1000);
 }

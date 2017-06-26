@@ -22,10 +22,15 @@
 #define MOKA_LEDS_H
 
 #include <Arduino.h>
+#include "Timer/Timer.h"
+
+extern bool _ml_displayBlink;
 
 void ml_init();
 void ml_setColor(uint8_t ledId, uint8_t color);
 void ml_setColor(uint8_t ledId, uint8_t rChannel, uint8_t gChannel, uint8_t bChannel);
+
+uint32_t ml_getColor(uint8_t ledId);
 
 void ml_setLed(uint16_t state);
 void ml_setLed(uint8_t ledId, bool state);
@@ -35,9 +40,9 @@ void ml_setBlinkState(bool state);
 void ml_setBlinkOnDelay(uint16_t delay);
 void ml_setBlinkOffDelay(uint16_t delay);
 
-void ml_clrLeds();
+void ml_blink();
 
-uint32_t ml_getLed(uint8_t ledId);
+void ml_clrLeds();
 
 void ml_update();
 

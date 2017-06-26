@@ -50,6 +50,8 @@ const uint8_t DEBOUNCE_DELAY = 0x82;	// DEBOUNCE_DELAY + 1 byte
 
 const uint8_t HAS_CHANGED = 0x83;		// HAS_CHANGED + 1 byte from slave to master // INT emitted
 
+const uint8_t COLOR_MODE = 0x84; 		// COLOR_MODE | mode
+
 const uint8_t CLR_DISPLAY = 0xF0;		// CLR_DISPLAY
 const uint8_t UPDATE_LEDS = 0xF5;		// UPDATE_LEDS
 
@@ -74,7 +76,8 @@ const uint8_t baseAddress = 10;
 uint8_t twiAddress = baseAddress;
 
 
-//WTI init function.
+
+//TWI init function.
 void mw_init(){
     // Setting address pins
     // PB0: addr0: input pullup
@@ -105,25 +108,24 @@ void mw_init(){
     Wire.onRequest(mw_requestHandler);
 }
 
-void mw_receiveHandler(uint8_t bytes){
+void mw_receiveHandler(int bytes){
 	uint8_t command = Wire.read();
-	uint8_t bytesToRead = 0;
 
 	if(_mw_colorMode == COLOR_MODE_8){
 		if(((command ^ SET_ONE_LED) & 0xF0) == 0){
 			uint8_t value = Wire.read();
-			_ml_setColor(command & 0x0F, value);
+			ml_setColor(command & 0x0F, value);
 
 		} else if(((command ^ SET_GLOBAL_LED) & 0xF0) == 0){
 			uint8_t value = Wire.read();
 			for(uint8_t i = 0; i < 16; i++){
-				_ml_setColor(i, value);				
+				ml_setColor(i, value);				
 			}
 
 		} else if(((command ^ SET_ALL_LED) & 0xF0) == 0){
 			for(uint8_t i = 0; i < 16; i++){
 				uint8_t value = Wire.read();
-				_ml_setColor(i, value);				
+				ml_setColor(i, value);				
 			}
 		}
 
@@ -132,14 +134,14 @@ void mw_receiveHandler(uint8_t bytes){
 			uint8_t rValue = Wire.read();
 			uint8_t gValue = Wire.read();
 			uint8_t bValue = Wire.read();
-			_ml_setColor(command & 0x0F, rValue, gValue, bValue);
+			ml_setColor(command & 0x0F, rValue, gValue, bValue);
 
 		} else if(((command ^ SET_GLOBAL_LED) & 0xF0) == 0){
 			uint8_t rValue = Wire.read();
 			uint8_t gValue = Wire.read();
 			uint8_t bValue = Wire.read();
 			for(uint8_t i = 0; i < 16; i++){
-				_ml_setColor(i, rValue, gValue, bValue);				
+				ml_setColor(i, rValue, gValue, bValue);				
 			}
 
 		} else if(((command ^ SET_ALL_LED) & 0xF0) == 0){
@@ -147,7 +149,7 @@ void mw_receiveHandler(uint8_t bytes){
 				uint8_t rValue = Wire.read();
 				uint8_t gValue = Wire.read();
 				uint8_t bValue = Wire.read();
-				_ml_setColor(i, rValue, gValue, bValue);				
+				ml_setColor(i, rValue, gValue, bValue);				
 			}
 		}
 	}
@@ -161,28 +163,32 @@ void mw_receiveHandler(uint8_t bytes){
 		ml_setLed(data);
 
 	} else if(((command ^ DISPLAY_STATE) & 0xF0) == 0){
-		ml_setDisplayState(command & 0x01);
+		ml_setDisplayState((bool)(command & 0x01));
 
 	} else if(((command ^ BLINK_STATE) & 0xF0) == 0){
-		ml_setBlinkState(command & 0x01);
+		ml_setBlinkState((bool)(command & 0x01));
 
 	} else if((command ^ BLINK_ON_DELAY) == 0){
 		uint16_t delay = 0;
 		delay |= (uint16_t)(Wire.read() << 8);
 		delay |= (uint16_t)(Wire.read());
-		ml_etBlinkOnDelay(delay);
+		ml_setBlinkOnDelay(delay);
 
 	} else if((command ^ BLINK_OFF_DELAY) == 0){
 		uint16_t delay = 0;
 		delay |= (uint16_t)(Wire.read() << 8);
 		delay |= (uint16_t)(Wire.read());
-		ml_etBlinkOffDelay(delay);
+		ml_setBlinkOffDelay(delay);
+		
 	} else if((command ^ DEBOUNCE_DELAY) == 0){
 		uint8_t delay = Wire.read();
 		mp_setDebounceDelay(delay);
 
 	} else if((command ^ HAS_CHANGED) == 0){
 		_mw_twiState = TWI_SEND_INT;
+
+	} else if(((command ^ COLOR_MODE) & 0xFE) == 0){
+		_mw_colorMode = (command & 0x01);
 	} else if((command ^ CLR_DISPLAY) == 0){
 		ml_clrLeds();
 	} else if((command ^ UPDATE_LEDS) == 0){
@@ -193,15 +199,15 @@ void mw_receiveHandler(uint8_t bytes){
 
 }
 
-void mw_requestHandler(void){
-	switch _mw_twiState{
+void mw_requestHandler(){
+	switch (_mw_twiState){
 		case TWI_SEND_BUTTON:
-			Wire.write(_mp_getButtons());
+			Wire.write(mp_getButtons());
 			_mw_twiState = TWI_SEND_IDLE;
 			break;
 		case TWI_SEND_INT:
 			Wire.write(_mp_int);
-			_mp_int = 0;
+			_mp_int = false;
 			_mw_twiState = TWI_SEND_IDLE;
 			break;
 		default:

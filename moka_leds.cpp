@@ -18,7 +18,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
- #include "moka_leds.h"
+#include "moka_leds.h"
 
 
 // leds are numbered from 0 to 15, from left to right and from top to bottom
@@ -30,6 +30,8 @@
 // and turned off again when all bits have been shifted.
 
 //The top number when bit shifting. This is 16 leds * 3 colors * 8 bits
+
+
 const uint16_t _ml_top = 384;
 
 //The table storing the current led color.
@@ -50,7 +52,10 @@ bool _ml_displayBlink = false;
 bool _ml_currentBlink = false;
 
 uint16_t _ml_blinkOnDelay = 1000;
-uint16_t _ml_displayOffDelay = 1000;
+uint16_t _ml_blinkOffDelay = 1000;
+
+Timer timerBlinkOn = Timer();
+Timer timerBlinkOff = Timer();
 
 //Init the timer for led driving
 void ml_init(){
@@ -86,12 +91,18 @@ void ml_init(){
     DDRD |= _BV(DDD3);
     PORTD &= ~(_BV(PORTD3));
 
+    // Blink timers settings
+    timerBlinkOn.init();
+    timerBlinkOn.setDelay(_ml_blinkOnDelay);
+    timerBlinkOff.init();
+    timerBlinkOff.setDelay(_ml_blinkOffDelay);
+
 }
 
 // Set led value with 8 bits-defined color
 // color is 0xAARRGGBB, and is converted into 3-bytes color value before to be stored in led table
 // 1 offset on the alpha channel is for having 4 steps of luminosity.
-void ml_setLed(uint8_t ledId, uint8_t color){
+void ml_setColor(uint8_t ledId, uint8_t color){
 	uint8_t aChannel = ((color >> 6) & 0x03) + 1;
 	uint8_t rChannel = (color >> 4) & 0x03;
 	uint8_t gChannel = (color >> 2) & 0x03;
@@ -99,19 +110,19 @@ void ml_setLed(uint8_t ledId, uint8_t color){
 	rChannel *= aChannel * 21;
 	gChannel *= aChannel * 21;
 	bChannel *= aChannel * 21;
-	ml_setLed(ledId, rChannel, gChannel, bChannel);
+	ml_setColor(ledId, rChannel, gChannel, bChannel);
 
 }
 
 //Set led value with 8 bits value for R, G and B channels.
-void ml_setLed(uint8_t ledId, uint8_t rChannel, uint8_t gChannel, uint8_t bChannel){
+void ml_setColor(uint8_t ledId, uint8_t rChannel, uint8_t gChannel, uint8_t bChannel){
 	_ml_ledColor[ledId][0] = gChannel;
 	_ml_ledColor[ledId][1] = rChannel;
 	_ml_ledColor[ledId][2] = bChannel;
 }
 
 //Get led value on 24 bits
-uint32_t ml_getLed(uint8_t ledId){
+uint32_t ml_getColor(uint8_t ledId){
 	uint8_t rChannel = _ml_ledColor[ledId][1];
 	uint8_t gChannel = _ml_ledColor[ledId][0];
 	uint8_t bChannel = _ml_ledColor[ledId][2];
@@ -127,7 +138,7 @@ void ml_update(){
 	//To save compute time during interrupt, each bit length is precomputed before turning the timer on.
 	// If diplay is Off, or blink is On and current blink is Off, we send only zeros.
 	if(!_ml_displayOn || (_ml_displayBlink && !_ml_currentBlink)){
-		for(uint16_t index = 0; i < _ml_top; i++){
+		for(uint16_t index = 0; index < _ml_top; index++){
 			_ml_pwmTable[index] = 5;
 		}
 	// Else, we can send data corresponding to pixels
@@ -140,19 +151,18 @@ void ml_update(){
 					uint8_t index = channel + led * 3;
 					for(uint8_t bit = 0; bit < 8; bit++){
 
-						if((_ml_ledColor[led][channel]) & (1 << bit) & ledState){
+						if((_ml_ledColor[led][channel]) & (1 << bit)){
 							_ml_pwmTable[index + bit] = 10;
 
 						} else {
 							_ml_pwmTable[index + bit] = 5;
-
 						}
 					}
 				}
 			//But if the led is independently turned Off, we directly set 0 for it.
 			} else {
 				for(uint8_t i = 0; i < 24; i++){
-							_ml_pwmTable[index + bit] = 5;					
+							_ml_pwmTable[led * 3 + i] = 5;					
 				}
 			}
 		}
@@ -196,6 +206,9 @@ void ml_setDisplayState(bool state){
 // Set the blink state (turned on or off)
 void ml_setBlinkState(bool state){
 	_ml_displayBlink = state;
+	if(state){
+		timerBlinkOn.start();
+	}
 }
 
 //Set the duration of the on state when blinking
@@ -206,6 +219,18 @@ void ml_setBlinkOnDelay(uint16_t delay){
 //Set the duration of the off state when blinking
 void ml_setBlinkOffDelay(uint16_t delay){
 	_ml_blinkOffDelay = delay;
+}
+
+void ml_blink(){
+	if(timerBlinkOff.update()){
+		_ml_currentBlink = true;
+		timerBlinkOn.start();
+		ml_update();
+	} else if(timerBlinkOn.update()){
+		_ml_currentBlink = false;
+		timerBlinkOff.start();
+		ml_update();
+	}
 }
 
 //Clear all leds (each channel of each led is set to 0)

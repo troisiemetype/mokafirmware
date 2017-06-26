@@ -23,6 +23,7 @@
 
 #include <Arduino.h>
 
+extern bool _mp_int;
 
 void mp_init();
 
@@ -32,5 +33,6 @@ bool mp_getButton(uint8_t button);
 uint16_t mp_getButtons();
 
 bool mp_update();
+
 
 #endif

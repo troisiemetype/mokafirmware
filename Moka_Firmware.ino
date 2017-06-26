@@ -69,9 +69,10 @@
 #include "moka_pad.h"
 #include "moka_twi.h"
 
+#include "Timer/Timer.h"
+
 //Constants definition
 const uint8_t nbLed = 16;
-
 
 void setup(){
     //Setting up the pins
@@ -88,7 +89,6 @@ void setup(){
     PORTD = 0xF3;
     */
 
-    //Led timer setting
     ml_init();
 
     //Pad setting
@@ -96,13 +96,17 @@ void setup(){
 
     mw_init();
 
-    //
     //Led init
     randomSeed(3224);
 }
 
 void loop(){
     mp_update();
+
+    if(_ml_displayBlink){
+        ml_blink();
+    }
+
     testRandomLed();
 
 }
@@ -110,7 +114,7 @@ void loop(){
 //Test function
 void testRandomLed(){
     for (uint8_t i = 0; i < 16; i++){
-        ml_setLed(i, random(256), random(256), random(256));
+        ml_setColor(i, random(256), random(256), random(256));
     }
     ml_update();
 

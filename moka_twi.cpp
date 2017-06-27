@@ -19,6 +19,10 @@
  */
 
 #include "moka_twi.h"
+
+#include "moka_leds.h"
+#include "moka_pad.h"
+
 #include <Wire.h>
 
 /* This file manages TWI communication, and dispatch requests from master to slave functions
@@ -187,6 +191,7 @@ void mw_receiveHandler(int bytes){
 	} else if((command ^ HAS_CHANGED) == 0){
 		_mw_twiState = TWI_SEND_INT;
 
+		// TODO: see if it work like that, or if it will have to be changed.
 	} else if(((command ^ COLOR_MODE) & 0xFE) == 0){
 		_mw_colorMode = (command & 0x01);
 	} else if((command ^ CLR_DISPLAY) == 0){
@@ -205,12 +210,12 @@ void mw_requestHandler(){
 			Wire.write(mp_getButtons());
 			_mw_twiState = TWI_SEND_IDLE;
 			break;
-		case TWI_SEND_INT:
+/*		case TWI_SEND_INT:
 			Wire.write(_mp_int);
 			_mp_int = false;
 			_mw_twiState = TWI_SEND_IDLE;
 			break;
-		default:
+*/		default:
 			break;
 	}
 

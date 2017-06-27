@@ -22,7 +22,6 @@
 #define MOKA_LEDS_H
 
 #include <Arduino.h>
-#include "Timer/Timer.h"
 
 extern bool _ml_displayBlink;
 

@@ -1,0 +1,178 @@
+//Incrementation pointeur
+
+00000ab6 <__vector_8>:
+     ab6:	1f 92       	push	r1
+     ab8:	0f 92       	push	r0
+     aba:	0f b6       	in	r0, 0x3f	; 63
+     abc:	0f 92       	push	r0
+     abe:	11 24       	eor	r1, r1
+     ac0:	8f 93       	push	r24
+     ac2:	9f 93       	push	r25
+     ac4:	ef 93       	push	r30
+     ac6:	ff 93       	push	r31
+     ac8:	e0 91 9c 02 	lds	r30, 0x029C	; 0x80029c <_p_ml_current>
+     acc:	f0 91 9d 02 	lds	r31, 0x029D	; 0x80029d <_p_ml_current+0x1>
+     ad0:	cf 01       	movw	r24, r30
+     ad2:	01 96       	adiw	r24, 0x01	; 1
+     ad4:	90 93 9d 02 	sts	0x029D, r25	; 0x80029d <_p_ml_current+0x1>
+     ad8:	80 93 9c 02 	sts	0x029C, r24	; 0x80029c <_p_ml_current>
+     adc:	81 81       	ldd	r24, Z+1	; 0x01
+     ade:	80 93 b4 00 	sts	0x00B4, r24	; 0x8000b4 <__data_load_end+0x7fefda>
+     ae2:	ff 91       	pop	r31
+     ae4:	ef 91       	pop	r30
+     ae6:	9f 91       	pop	r25
+     ae8:	8f 91       	pop	r24
+     aea:	0f 90       	pop	r0
+     aec:	0f be       	out	0x3f, r0	; 63
+     aee:	0f 90       	pop	r0
+     af0:	1f 90       	pop	r1
+     af2:	18 95       	reti
+
+//incrémentation pointeur puis modification OCR2B
+
+00000ab6 <__vector_8>:
+     ab6: 1f 92          push r1
+     ab8: 0f 92          push r0
+     aba: 0f b6          in   r0, 0x3f  ; 63
+     abc: 0f 92          push r0
+     abe: 11 24          eor  r1, r1
+     ac0: 8f 93          push r24
+     ac2: 9f 93          push r25
+     ac4: ef 93          push r30
+     ac6: ff 93          push r31
+     ac8: e0 91 9c 02    lds  r30, 0x029C    ; 0x80029c <_p_ml_current>
+     acc: f0 91 9d 02    lds  r31, 0x029D    ; 0x80029d <_p_ml_current+0x1>
+     ad0: cf 01          movw r24, r30
+     ad2: 01 96          adiw r24, 0x01 ; 1
+     ad4: 90 93 9d 02    sts  0x029D, r25    ; 0x80029d <_p_ml_current+0x1>
+     ad8: 80 93 9c 02    sts  0x029C, r24    ; 0x80029c <_p_ml_current>
+     adc: 81 81          ldd  r24, Z+1  ; 0x01
+     ade: 80 93 b4 00    sts  0x00B4, r24    ; 0x8000b4 <__data_load_end+0x7fefda>
+     ae2: ff 91          pop  r31
+     ae4: ef 91          pop  r30
+     ae6: 9f 91          pop  r25
+     ae8: 8f 91          pop  r24
+     aea: 0f 90          pop  r0
+     aec: 0f be          out  0x3f, r0  ; 63
+     aee: 0f 90          pop  r0
+     af0: 1f 90          pop  r1
+     af2: 18 95          reti
+
+//même chose, mais le pointeur n'est pas volatile
+
+00000ab6 <__vector_8>:
+     ab6: 1f 92          push r1
+     ab8: 0f 92          push r0
+     aba: 0f b6          in   r0, 0x3f  ; 63
+     abc: 0f 92          push r0
+     abe: 11 24          eor  r1, r1
+     ac0: 8f 93          push r24
+     ac2: 9f 93          push r25
+     ac4: ef 93          push r30
+     ac6: ff 93          push r31
+     ac8: e0 91 9c 02    lds  r30, 0x029C    ; 0x80029c <_p_ml_current>
+     acc: f0 91 9d 02    lds  r31, 0x029D    ; 0x80029d <_p_ml_current+0x1>
+     ad0: cf 01          movw r24, r30
+     ad2: 01 96          adiw r24, 0x01 ; 1
+     ad4: 90 93 9d 02    sts  0x029D, r25    ; 0x80029d <_p_ml_current+0x1>
+     ad8: 80 93 9c 02    sts  0x029C, r24    ; 0x80029c <_p_ml_current>
+     adc: 81 81          ldd  r24, Z+1  ; 0x01
+     ade: 80 93 b4 00    sts  0x00B4, r24    ; 0x8000b4 <__data_load_end+0x7fefda>
+     ae2: ff 91          pop  r31
+     ae4: ef 91          pop  r30
+     ae6: 9f 91          pop  r25
+     ae8: 8f 91          pop  r24
+     aea: 0f 90          pop  r0
+     aec: 0f be          out  0x3f, r0  ; 63
+     aee: 0f 90          pop  r0
+     af0: 1f 90          pop  r1
+     af2: 18 95          reti
+
+
+// Saut conditionnel après l'incrémentation du pointeur
+
+00000ac2 <__vector_8>:
+     ac2: 1f 92          push r1
+     ac4: 0f 92          push r0
+     ac6: 0f b6          in   r0, 0x3f  ; 63
+     ac8: 0f 92          push r0
+     aca: 11 24          eor  r1, r1
+     acc: 8f 93          push r24
+     ace: 9f 93          push r25
+     ad0: ef 93          push r30
+     ad2: ff 93          push r31
+     ad4: e0 91 00 01    lds  r30, 0x0100    ; 0x800100 <__data_start>
+     ad8: f0 91 01 01    lds  r31, 0x0101    ; 0x800101 <__data_start+0x1>
+     adc: cf 01          movw r24, r30
+     ade: 01 96          adiw r24, 0x01 ; 1
+     ae0: 90 93 01 01    sts  0x0101, r25    ; 0x800101 <__data_start+0x1>
+     ae4: 80 93 00 01    sts  0x0100, r24    ; 0x800100 <__data_start>
+     ae8: 81 81          ldd  r24, Z+1  ; 0x01
+     aea: 80 93 b4 00    sts  0x00B4, r24    ; 0x8000b4 <__data_load_end+0x7fefaa>
+     aee: 80 91 9c 02    lds  r24, 0x029C    ; 0x80029c <_ml_current>
+     af2: 90 91 9d 02    lds  r25, 0x029D    ; 0x80029d <_ml_current+0x1>
+     af6: 01 97          sbiw r24, 0x01 ; 1
+     af8: 90 93 9d 02    sts  0x029D, r25    ; 0x80029d <_ml_current+0x1>
+     afc: 80 93 9c 02    sts  0x029C, r24    ; 0x80029c <_ml_current>
+     b00: 89 2b          or   r24, r25
+     b02: 31 f4          brne .+12      ; 0xb10 <__vector_8+0x4e>
+     b04: 80 91 b1 00    lds  r24, 0x00B1    ; 0x8000b1 <__data_load_end+0x7fefa7>
+     b08: 8e 7f          andi r24, 0xFE ; 254
+     b0a: 80 93 b1 00    sts  0x00B1, r24    ; 0x8000b1 <__data_load_end+0x7fefa7>
+     b0e: 5b 98          cbi  0x0b, 3   ; 11
+     b10: ff 91          pop  r31
+     b12: ef 91          pop  r30
+     b14: 9f 91          pop  r25
+     b16: 8f 91          pop  r24
+     b18: 0f 90          pop  r0
+     b1a: 0f be          out  0x3f, r0  ; 63
+     b1c: 0f 90          pop  r0
+     b1e: 1f 90          pop  r1
+     b20: 18 95          reti
+
+
+
+
+
+//Saut conditionnel
+
+00000aaa <__vector_8>:
+     aaa: 1f 92          push r1
+     aac: 0f 92          push r0
+     aae: 0f b6          in   r0, 0x3f  ; 63
+     ab0: 0f 92          push r0
+     ab2: 11 24          eor  r1, r1
+     ab4: 2f 93          push r18
+     ab6: 8f 93          push r24
+     ab8: 9f 93          push r25
+     aba: ef 93          push r30
+     abc: ff 93          push r31
+     abe: 80 91 9a 02    lds  r24, 0x029A    ; 0x80029a <_ml_current>
+     ac2: 90 91 9b 02    lds  r25, 0x029B    ; 0x80029b <_ml_current+0x1>
+     ac6: 01 96          adiw r24, 0x01 ; 1
+     ac8: 90 93 9b 02    sts  0x029B, r25    ; 0x80029b <_ml_current+0x1>
+     acc: 80 93 9a 02    sts  0x029A, r24    ; 0x80029a <_ml_current>
+     ad0: 80 38          cpi  r24, 0x80 ; 128
+     ad2: 91 40          sbci r25, 0x01 ; 1
+     ad4: 39 f4          brne .+14      ; 0xae4 <__vector_8+0x3a>
+     ad6: 80 91 b1 00    lds  r24, 0x00B1    ; 0x8000b1 <__data_load_end+0x7fefc1>
+     ada: 8e 7f          andi r24, 0xFE ; 254
+     adc: 80 93 b1 00    sts  0x00B1, r24    ; 0x8000b1 <__data_load_end+0x7fefc1>
+     ae0: 5b 98          cbi  0x0b, 3   ; 11
+     ae2: 09 c0          rjmp .+18      ; 0xaf6 <__vector_8+0x4c>
+     ae4: e0 91 9a 02    lds  r30, 0x029A    ; 0x80029a <_ml_current>
+     ae8: f0 91 9b 02    lds  r31, 0x029B    ; 0x80029b <_ml_current+0x1>
+     aec: e6 5e          subi r30, 0xE6 ; 230
+     aee: fe 4f          sbci r31, 0xFE ; 254
+     af0: 80 81          ld   r24, Z
+     af2: 80 93 b4 00    sts  0x00B4, r24    ; 0x8000b4 <__data_load_end+0x7fefc4>
+     af6: ff 91          pop  r31
+     af8: ef 91          pop  r30
+     afa: 9f 91          pop  r25
+     afc: 8f 91          pop  r24
+     afe: 2f 91          pop  r18
+     b00: 0f 90          pop  r0
+     b02: 0f be          out  0x3f, r0  ; 63
+     b04: 0f 90          pop  r0
+     b06: 1f 90          pop  r1
+     b08: 18 95          reti

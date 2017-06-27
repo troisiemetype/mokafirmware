@@ -23,9 +23,6 @@
 
 #include <Arduino.h>
 
-#include "moka_leds.h"
-#include "moka_pad.h"
-
 void mw_init();
 
 void mw_receiveHandler(int bytes);

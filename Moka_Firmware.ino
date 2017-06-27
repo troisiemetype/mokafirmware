@@ -55,7 +55,7 @@
  * PORTD mapping:
  * PD0: addr3: input pullup
  * PD1: addr4: input pullup
- * PD2: int signal: output, low.
+ * PD2: int signal: output, low. NOTA: not implemented yet, due to board misconception leading to short.
  * PD3: led data: output, low.
  * PD4: button col 1: input pullup
  * PD5: button col 2: input pullup
@@ -69,7 +69,6 @@
 #include "moka_pad.h"
 #include "moka_twi.h"
 
-#include "Timer/Timer.h"
 
 //Constants definition
 const uint8_t nbLed = 16;
@@ -102,10 +101,6 @@ void setup(){
 
 void loop(){
     mp_update();
-
-    if(_ml_displayBlink){
-        ml_blink();
-    }
 
     testRandomLed();
 

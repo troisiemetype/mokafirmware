@@ -23,7 +23,7 @@
 
 #include <Arduino.h>
 
-extern bool _mp_int;
+//extern bool _mp_int;
 
 void mp_init();
 

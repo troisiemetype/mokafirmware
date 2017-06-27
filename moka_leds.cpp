@@ -29,20 +29,29 @@
 // It's disabled most of the time, only turned on when updating,
 // and turned off again when all bits have been shifted.
 
+// Moka run at 8MHz on the calibrated internal RC oscillator.
+// 
+
 //The top number when bit shifting. This is 16 leds * 3 colors * 8 bits
 
 
-const uint16_t _ml_top = 384;
+const uint16_t LED_TOP = 384;
+
+const uint8_t OCR2B_0_LENGTH = 3;
+const uint8_t OCR2B_1_LENGTH = 6;
+const uint8_t OCR2A_TOP = 12;
+
 
 //The table storing the current led color.
 uint8_t _ml_ledColor[16][3];
 //The table storing the timer value for each bit
-uint8_t _ml_pwmTable[_ml_top];
+uint8_t _ml_pwmTable[LED_TOP];
 //Led state, i.e. on or off: one bit per led
 uint16_t _ml_ledState = 0;
 
 //The current bit index when bitshifting
 volatile uint16_t _ml_current = 0;
+uint8_t *_p_ml_current = _ml_pwmTable;
 
 //The display state, i.e. if leds are lit or shut, independently of their respective values
 bool _ml_displayOn = false;
@@ -54,9 +63,6 @@ bool _ml_currentBlink = false;
 uint16_t _ml_blinkOnDelay = 1000;
 uint16_t _ml_blinkOffDelay = 1000;
 
-Timer timerBlinkOn = Timer();
-Timer timerBlinkOff = Timer();
-
 //Init the timer for led driving
 void ml_init(){
 	//Disable interrupts when setting registers
@@ -65,23 +71,23 @@ void ml_init(){
     //The SK6812 leds are driven by only one pin, which is both data and clock.
     //A 0 is sent by driven the pin high for 0.3us and low for 0.9us.
     //A 1 is sent by driven the pin high for 0.6us and low for 0.6us.
-    //At 16MHz, 0.3us is 4.8 clock cycles
-    //          0.6us is 9.6 clock cycles
-    //          0.9us is 14.4 clock cycles
-    //The mean time of a bit is given to be 1.25us, that is 20 clock cycles.
-    //So we drive pin high 5 clock cycle for a 0, 10 for a 1, and clear counter at 20.
+    //At 8MHz,  0.3us is 2.4 clock cycles
+    //          0.6us is 4.8 clock cycles
+    //          0.9us is 7.2 clock cycles
+    //The mean time of a bit is given to be 1.25us, that is 10 clock cycles.
+    //So we drive pin high 3 clock cycle for a 0, 6 for a 1, and clear counter at 12.
 
     //Timer 2 setting (see atmel datasheet, chapter 18, Timer 2):
     //fast PWM
     //counting from bottom to OCR2A
     //OCR2B clear on compare match, set on bottom.
 
-    TCCR2A = 0x23;          //COM2A pin disable, COM2B pin clear on compare match, WGM2 fast pwm
-    TCCR2B = 0x08;          //WGM22 TOP = OCR2A, TIMER disable, no prescalling.
-    TIMSK2 = 0x02;			//OCIE2A enable. It must be set for the compare interrupt to fire.
-    TCNT2 = 0;              //Init timer to 0
-    OCR2A = 20;             //One bit of led data is 1.25 us, that is 20 clock cycles
-    OCR2B = 5;              //Defaut to 0. See K6812 datasheet
+    TCCR2A = 0x23;          // COM2A pin disable, COM2B pin clear on compare match, WGM2 fast pwm
+    TCCR2B = 0x08;          // WGM22 TOP = OCR2A, TIMER disable, no prescalling.
+    TIMSK2 = 0x04;			// OCIE2B enable. It must be set for the compare interrupt to fire.
+    TCNT2 = 0;              // Init timer to 0
+    OCR2A = OCR2A_TOP;      // One bit of led data is 1.25 us, that is 10 clock cycles
+    OCR2B = OCR2B_0_LENGTH; // Defaut to 0. See K6812 datasheet
 
     //Set interrupt again;
     sei();
@@ -89,13 +95,7 @@ void ml_init(){
     //Set the led data pin, output, default to 0;
 
     DDRD |= _BV(DDD3);
-    PORTD &= ~(_BV(PORTD3));
-
-    // Blink timers settings
-    timerBlinkOn.init();
-    timerBlinkOn.setDelay(_ml_blinkOnDelay);
-    timerBlinkOff.init();
-    timerBlinkOff.setDelay(_ml_blinkOffDelay);
+    PORTD &= ~(_BV(PORTD3));    
 
 }
 
@@ -138,8 +138,8 @@ void ml_update(){
 	//To save compute time during interrupt, each bit length is precomputed before turning the timer on.
 	// If diplay is Off, or blink is On and current blink is Off, we send only zeros.
 	if(!_ml_displayOn || (_ml_displayBlink && !_ml_currentBlink)){
-		for(uint16_t index = 0; index < _ml_top; index++){
-			_ml_pwmTable[index] = 5;
+		for(uint16_t index = 0; index < LED_TOP; index++){
+			_ml_pwmTable[index] = OCR2B_0_LENGTH;
 		}
 	// Else, we can send data corresponding to pixels
 	} else {
@@ -152,35 +152,46 @@ void ml_update(){
 					for(uint8_t bit = 0; bit < 8; bit++){
 
 						if((_ml_ledColor[led][channel]) & (1 << bit)){
-							_ml_pwmTable[index + bit] = 10;
+							_ml_pwmTable[index + bit] = OCR2B_1_LENGTH;
 
 						} else {
-							_ml_pwmTable[index + bit] = 5;
+							_ml_pwmTable[index + bit] = OCR2B_0_LENGTH;
 						}
 					}
 				}
 			//But if the led is independently turned Off, we directly set 0 for it.
 			} else {
 				for(uint8_t i = 0; i < 24; i++){
-							_ml_pwmTable[led * 3 + i] = 5;					
+					_ml_pwmTable[led * 3 + i] = OCR2B_0_LENGTH;
 				}
 			}
 		}
 	}
 
 	//Timer is turned on (no prescaller), OCR2B pin is set high
+	_p_ml_current = _ml_pwmTable;
+	_ml_current = LED_TOP;
+	TCNT2 = 0;
 	PORTD |= _BV(PORTD3);
 	TCCR2B |= _BV(CS20);
 }
 
-//Timer COMPA interrupt
-ISR(TIMER2_COMPA_vect){
+// Timer COMPB interrupt
+// OCR2B value is changed on COMP B match:
+// timing is very critical on this fast-firing interrupt, changing value as soon as it's been used
+// enables us to be ready when COMP A happens.
+ISR(TIMER2_COMPB_vect){
 	//Test current bit, stop the timer if bit shifting is finished, or load the next bit length in OCR2B
-	if(++_ml_current == _ml_top){
+/*	if(++_ml_current == LED_TOP){
 		TCCR2B &= ~(_BV(CS20));
 		PORTD &= ~(_BV(PORTD3));
 	} else {
 		OCR2B = _ml_pwmTable[_ml_current];
+	}*/
+	OCR2B = *(++_p_ml_current);
+	if(!(--_ml_current)){
+		TCCR2B &= ~(_BV(CS20));
+		PORTD &= ~(_BV(PORTD3));
 	}
 }
 
@@ -206,9 +217,6 @@ void ml_setDisplayState(bool state){
 // Set the blink state (turned on or off)
 void ml_setBlinkState(bool state){
 	_ml_displayBlink = state;
-	if(state){
-		timerBlinkOn.start();
-	}
 }
 
 //Set the duration of the on state when blinking
@@ -222,15 +230,7 @@ void ml_setBlinkOffDelay(uint16_t delay){
 }
 
 void ml_blink(){
-	if(timerBlinkOff.update()){
-		_ml_currentBlink = true;
-		timerBlinkOn.start();
-		ml_update();
-	} else if(timerBlinkOn.update()){
-		_ml_currentBlink = false;
-		timerBlinkOff.start();
-		ml_update();
-	}
+
 }
 
 //Clear all leds (each channel of each led is set to 0)

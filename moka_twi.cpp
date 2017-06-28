@@ -81,7 +81,7 @@ uint8_t twiAddress = baseAddress;
 
 
 
-//TWI init function.
+// TWI init function.
 void mw_init(){
     // Setting address pins
     // PB0: addr0: input pullup
@@ -107,6 +107,9 @@ void mw_init(){
     twiAddress = baseAddress + twiOffset;
 
     Wire.begin(twiAddress);
+
+    // Enable general call recognition, for broadcast adressing.
+    TWAR |= _BV(TWGCE);
 
     Wire.onReceive(mw_receiveHandler);
     Wire.onRequest(mw_requestHandler);
@@ -207,7 +210,9 @@ void mw_receiveHandler(int bytes){
 void mw_requestHandler(){
 	switch (_mw_twiState){
 		case TWI_SEND_BUTTON:
-			Wire.write(mp_getButtons());
+			uint16_t buttons = mp_getButtons();
+			Wire.write((uint8_t)(buttons >> 8));
+			Wire.write((uint8_t)buttons);
 			_mw_twiState = TWI_SEND_IDLE;
 			break;
 /*		case TWI_SEND_INT:

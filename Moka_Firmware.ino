@@ -69,9 +69,16 @@
 #include "moka_pad.h"
 #include "moka_twi.h"
 
-
 //Constants definition
 const uint8_t nbLed = 16;
+
+const uint8_t dataPin = 3;
+
+uint8_t rColor = 1;
+uint8_t gColor = 1;
+uint8_t bColor = 1;
+
+uint8_t color = 0b00000000;
 
 void setup(){
     //Setting up the pins
@@ -97,15 +104,55 @@ void setup(){
 
     //Led init
     randomSeed(3224);
+
+//    pad.begin();
 }
 
 void loop(){
-    mp_update();
+    
+    if(mp_update()){
 
-    testRandomLed();
+        uint16_t buttonState = mp_getButtons();
+
+        for(uint8_t i = 0; i < nbLed; i++){
+            if((buttonState & _BV(i)) == _BV(i)){
+                ml_setLed(i, true);
+                ml_setColor(i, random(256));
+//                pad.setPixelColor(i, random(256), random(256), random(256));
+            } else {
+                ml_setLed(i, false);
+//                pad.setPixelColor(i, 0, 0, 0);
+            }
+            ml_update();
+
+
+
+      }
+  }
+
+/*
+    for(uint8_t i = 0; i < nbLed; i++){
+        pad.setPixelColor(i, random(256), random(256), random(256));
+    }
+    pad.show();
+    delay(250);
+*/
+/*
+    rColor *= 2;
+    if(rColor >= 128){
+        rColor = 1;
+        gColor *= 2;
+        if(gColor >= 128){
+            gColor = 1;
+            bColor *= 2;
+            if(bColor >= 128) bColor = 1;
+        }
+
+    }
+*/    
 
 }
-
+/*
 //Test function
 void testRandomLed(){
     for (uint8_t i = 0; i < 16; i++){
@@ -115,4 +162,4 @@ void testRandomLed(){
 
     delay(1000);
 }
-
+*/

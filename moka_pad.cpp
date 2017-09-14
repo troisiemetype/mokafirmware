@@ -44,8 +44,8 @@ void mp_init(){
  * PD7: button col 4: input pullup
  */
 
-	DDRC |= 0x0F;
-	PORTC |= 0x0F;
+	DDRC &= ~(0x0F);
+	PORTC &= ~(0x0F);
 
 	DDRD &= ~(0xF0);
 	PORTD |= 0xF0;
@@ -84,13 +84,22 @@ bool mp_update(){
 	_mp_prev = _mp_now;
 	_mp_now = 0;
 	for(uint8_t row = 0; row < 4; row++){
-		PORTC |= 0x0F;
+		// Turn port C as input.
+		DDRC &= ~(0x0F);
+		PORTC &= ~(0x0F);
+//		PORTC |= 0x0F;
 		//Buttons are active low, so the row to be read is turned low.
+		DDRC |= _BV(row);
 		PORTC &= ~(_BV(row));
 		//Add a delay before reading?
-		uint8_t reading = (PIND & 0xF0) >> 4;
-		_mp_now |= ((reading & 0x0F) << row);
+		uint8_t reading = 0;
+		reading = (PIND & 0xF0);
+		reading >>= 4;
+		_mp_now |= ((reading) << (row * 4));
 	}
+	// Turn port C as input
+	DDRC &= ~(0x0F);
+	PORTC &= ~(0x0F);
 
 	if(_mp_prev != _mp_now){
 		_mp_time = millis();

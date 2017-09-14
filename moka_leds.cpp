@@ -35,23 +35,14 @@
 //The top number when bit shifting. This is 16 leds * 3 colors * 8 bits
 
 
-const uint16_t LED_TOP = 384;
-
-const uint8_t OCR2B_0_LENGTH = 3;
-const uint8_t OCR2B_1_LENGTH = 6;
-const uint8_t OCR2A_TOP = 12;
-
+const uint16_t NUM_LED = 16;
 
 //The table storing the current led color.
-uint8_t _ml_ledColor[16][3];
-//The table storing the timer value for each bit
-uint8_t _ml_pwmTable[LED_TOP];
+uint8_t _ml_ledColor[NUM_LED][3];
+uint8_t _ml_ledData[NUM_LED][3];
+
 //Led state, i.e. on or off: one bit per led
 uint16_t _ml_ledState = 0;
-
-//The current bit index when bitshifting
-volatile uint16_t _ml_current = 0;
-uint8_t *_p_ml_current = _ml_pwmTable;
 
 //The display state, i.e. if leds are lit or shut, independently of their respective values
 bool _ml_displayOn = false;
@@ -65,37 +56,13 @@ uint16_t _ml_blinkOffDelay = 1000;
 
 //Init the timer for led driving
 void ml_init(){
-	//Disable interrupts when setting registers
-    cli();
-
-    //The SK6812 leds are driven by only one pin, which is both data and clock.
-    //A 0 is sent by driven the pin high for 0.3us and low for 0.9us.
-    //A 1 is sent by driven the pin high for 0.6us and low for 0.6us.
-    //At 8MHz,  0.3us is 2.4 clock cycles
-    //          0.6us is 4.8 clock cycles
-    //          0.9us is 7.2 clock cycles
-    //The mean time of a bit is given to be 1.25us, that is 10 clock cycles.
-    //So we drive pin high 3 clock cycle for a 0, 6 for a 1, and clear counter at 12.
-
-    //Timer 2 setting (see atmel datasheet, chapter 18, Timer 2):
-    //fast PWM
-    //counting from bottom to OCR2A
-    //OCR2B clear on compare match, set on bottom.
-
-    TCCR2A = 0x23;          // COM2A pin disable, COM2B pin clear on compare match, WGM2 fast pwm
-    TCCR2B = 0x08;          // WGM22 TOP = OCR2A, TIMER disable, no prescalling.
-    TIMSK2 = 0x04;			// OCIE2B enable. It must be set for the compare interrupt to fire.
-    TCNT2 = 0;              // Init timer to 0
-    OCR2A = OCR2A_TOP;      // One bit of led data is 1.25 us, that is 10 clock cycles
-    OCR2B = OCR2B_0_LENGTH; // Defaut to 0. See K6812 datasheet
-
-    //Set interrupt again;
-    sei();
-
     //Set the led data pin, output, default to 0;
 
     DDRD |= _BV(DDD3);
-    PORTD &= ~(_BV(PORTD3));    
+    PORTD &= ~(_BV(PORTD3));   
+
+    ml_clrLeds(); 
+    ml_setDisplayState(true);
 
 }
 
@@ -131,68 +98,65 @@ uint32_t ml_getColor(uint8_t ledId){
 
 //Update the 16 leds.
 void ml_update(){
-	//Current index is incremented at each timer TOP
-	_ml_current = 0;
-
-	//A high state for a low bit is only 5 clock cycles.
-	//To save compute time during interrupt, each bit length is precomputed before turning the timer on.
-	// If diplay is Off, or blink is On and current blink is Off, we send only zeros.
-	if(!_ml_displayOn || (_ml_displayBlink && !_ml_currentBlink)){
-		for(uint16_t index = 0; index < LED_TOP; index++){
-			_ml_pwmTable[index] = OCR2B_0_LENGTH;
-		}
-	// Else, we can send data corresponding to pixels
-	} else {
-		for(uint8_t led = 0; led < 16; led++){
-			//If led is on, we compute each bit length for bit shifting
-			if(_ml_ledState & _BV(led)){
-				for(uint8_t channel = 0; channel < 3; channel++){
-					
-					uint8_t index = channel + led * 3;
-					for(uint8_t bit = 0; bit < 8; bit++){
-
-						if((_ml_ledColor[led][channel]) & (1 << bit)){
-							_ml_pwmTable[index + bit] = OCR2B_1_LENGTH;
-
-						} else {
-							_ml_pwmTable[index + bit] = OCR2B_0_LENGTH;
-						}
-					}
-				}
-			//But if the led is independently turned Off, we directly set 0 for it.
+	// If display is on, then copy values from ledColor to ledData
+	if(_ml_displayOn){
+		// For each led, copy value if led is lit, else fill color bytes with zeros
+		for(uint8_t i = 0; i < NUM_LED; i++){
+			if(_ml_ledState & _BV(i)){
+				memcpy(_ml_ledData[i], _ml_ledColor[i], 3);
 			} else {
-				for(uint8_t i = 0; i < 24; i++){
-					_ml_pwmTable[led * 3 + i] = OCR2B_0_LENGTH;
-				}
+				memset(_ml_ledData[i], 0, 3);
 			}
 		}
-	}
-
-	//Timer is turned on (no prescaller), OCR2B pin is set high
-	_p_ml_current = _ml_pwmTable;
-	_ml_current = LED_TOP;
-	TCNT2 = 0;
-	PORTD |= _BV(PORTD3);
-	TCCR2B |= _BV(CS20);
-}
-
-// Timer COMPB interrupt
-// OCR2B value is changed on COMP B match:
-// timing is very critical on this fast-firing interrupt, changing value as soon as it's been used
-// enables us to be ready when COMP A happens.
-ISR(TIMER2_COMPB_vect){
-	//Test current bit, stop the timer if bit shifting is finished, or load the next bit length in OCR2B
-/*	if(++_ml_current == LED_TOP){
-		TCCR2B &= ~(_BV(CS20));
-		PORTD &= ~(_BV(PORTD3));
+	// If display is off, then just fill led Data with zeros.
 	} else {
-		OCR2B = _ml_pwmTable[_ml_current];
-	}*/
-	OCR2B = *(++_p_ml_current);
-	if(!(--_ml_current)){
-		TCCR2B &= ~(_BV(CS20));
-		PORTD &= ~(_BV(PORTD3));
+		// ledData is filled with 0
+		memset(_ml_ledData, 0, sizeof(_ml_ledData));
 	}
+
+	// Pointer to ledData, and first byte of data to be sent to leds.
+	uint8_t *ptr = &_ml_ledData[0][0];
+	uint8_t curByte = *ptr;
+
+	// Value for turning deicated port pin high or low.
+	uint8_t hi = PORTD | _BV(PORTD3);
+	uint8_t lo = PORTD & ~_BV(PORTD3);
+
+	// Counters for total byte number, and for each bit in these bytes.
+	uint8_t counter = 0;
+	uint8_t nbByte = 0;
+
+	// Save current state register before to disable ISR.
+	uint8_t sreg = SREG;
+	cli();
+
+	asm volatile(
+		"ldi 	%[nbByte], 48			\n\t" // 1		Init bytes counter
+		"head%=:						\n\t" // /		Label head (new byte)
+		"ld 	%[curByte], %a[ptr]+	\n\t" // 2		Load the next value
+		"ldi 	%[counter], 8			\n\t" // 1		init bit counter
+		"bit%=:							\n\t" // /		Label bit (next bit)
+		"out 	%[port], %[hi]			\n\t" // 1		Set port pin high
+		"sbrs	%[curByte], 7			\n\t" // 1/2	Skip if bit is set
+		"out 	%[port], %[lo]			\n\t" // 1		Set port pin low
+		"lsl	%[curByte]				\n\t" // 1		Shift register left
+		"out 	%[port], %[lo]			\n\t" // 1		Set port bit low
+		"dec 	%[counter]				\n\t" // 1		Decrement bit counter
+		"brne	bit%=					\n\t" // 1/2	branch label bit if counter is 0
+		"dec 	%[nbByte]				\n\t" // 1		Decrement byte counter
+		"brne 	head%=					\n\t" // 1/2	branch label head if counter is 0
+
+		:	[counter]	"+d"	(counter),
+			[nbByte]	"+d"	(nbByte),
+			[curByte]	"+r"	(curByte)
+		:	[lo]		"r"		(lo),
+			[hi]		"r"		(hi),
+			[port]		"I"		(_SFR_IO_ADDR(PORTD)),
+			[ptr]		"e"		(ptr)
+	);
+
+	// Enable ISR again.
+	SREG = sreg;
 }
 
 // Set led states for a 16 bit int, each bit beeing a led
@@ -203,9 +167,9 @@ void ml_setLed(uint16_t state){
 // Set led state for one led
 void ml_setLed(uint8_t ledId, bool state){
 	if(state){
-		_ml_ledState |= ledId;
+		_ml_ledState |= _BV(ledId);
 	} else {
-		_ml_ledState &= ~(ledId);
+		_ml_ledState &= ~_BV(ledId);
 	}
 }
 

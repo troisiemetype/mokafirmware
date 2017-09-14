@@ -208,9 +208,11 @@ void mw_receiveHandler(int bytes){
 }
 
 void mw_requestHandler(){
+
+	uint16_t buttons = 0;
 	switch (_mw_twiState){
 		case TWI_SEND_BUTTON:
-			uint16_t buttons = mp_getButtons();
+			buttons = mp_getButtons();
 			Wire.write((uint8_t)(buttons >> 8));
 			Wire.write((uint8_t)buttons);
 			_mw_twiState = TWI_SEND_IDLE;

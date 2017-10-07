@@ -21,42 +21,51 @@
 // Button state are stored as a 16 bits value, each bit beeing a button state.
 
 #include "moka_pad.h"
+#include "moka_leds.h"
 
 uint16_t _mp_now;
 uint16_t _mp_prev;
 uint16_t _mp_state;
 uint16_t _mp_pState;
 
-uint32_t _mp_time;
+//independent debounce
+uint32_t _mp_time[16];
+
 uint16_t _mp_debounceDelay;
 
 //bool _mp_int = false;
 
+// Init all that is linked to buttons.
 void mp_init(){
 /*
- * PC0: button row 1 output, high.
- * PC1: button row 2 output, high.
- * PC2: button row 3 output, high.
- * PC3: button row 4 output, high.
- * PD4: button col 1: input pullup
- * PD5: button col 2: input pullup
- * PD6: button col 3: input pullup
- * PD7: button col 4: input pullup
+ * PC0: button col 1: input pullup.
+ * PC1: button col 2: input pullup.
+ * PC2: button col 3: input pullup.
+ * PC3: button col 4: input pullup.
+ * PD0: button row 1: output high / input.
+ * PD1: button row 2: output high / input.
+ * PD2: button row 3: output high / input.
+ * PD3: button row 4: output high / input.
  */
 
 	DDRC &= ~(0x0F);
-	PORTC &= ~(0x0F);
+	PORTC |= 0x0F;
 
-	DDRD &= ~(0xF0);
-	PORTD |= 0xF0;
+	DDRD &= ~(0x0F);
+	PORTD &= ~(0x0F);
 
-	_mp_prev = 0;
-	_mp_now = 0;
-	_mp_state = 0;
-	_mp_pState = 0;
+	_mp_prev = 0xFFFF;
+	_mp_now = 0xFFFF;
+	_mp_state = 0xFFFF;
+	_mp_pState = 0xFFFF;
 
-	_mp_time = millis();
-	_mp_debounceDelay = 5;
+	uint32_t _mp_tTime = millis();
+
+	for(uint8_t i = 0; i < 16; ++i){
+		_mp_time[i] = _mp_tTime;
+	}
+
+	_mp_debounceDelay = 3;
 
 }
 
@@ -78,39 +87,77 @@ uint16_t mp_getButtons(){
 	return ~_mp_state;
 }
 
-//update the pad reading. Debounce is applied to the whole pad, not a specific button.
+//update the pad reading.
 bool mp_update(){
 
 	_mp_prev = _mp_now;
 	_mp_now = 0;
 	for(uint8_t row = 0; row < 4; row++){
-		// Turn port C as input.
-		DDRC &= ~(0x0F);
-		PORTC &= ~(0x0F);
-//		PORTC |= 0x0F;
-		//Buttons are active low, so the row to be read is turned low.
-		DDRC |= _BV(row);
-		PORTC &= ~(_BV(row));
+		// Turn port D as input.
+		DDRD &= ~(0x0F);
+		PORTD &= ~(0x0F);
+		//Buttons are active low, so the row to be read is turned output low.
+		DDRD |= _BV(row);
+		PORTD &= ~(_BV(row));
 		//Add a delay before reading?
+		delay(1);
 		uint8_t reading = 0;
-		reading = (PIND & 0xF0);
-		reading >>= 4;
+		reading = (PINC & 0x0F);
 		_mp_now |= ((reading) << (row * 4));
 	}
-	// Turn port C as input
-	DDRC &= ~(0x0F);
-	PORTC &= ~(0x0F);
 
-	if(_mp_prev != _mp_now){
-		_mp_time = millis();
-		return false;
+	// Turn port D as input
+	DDRD &= ~(0x0F);
+	PORTD &= ~(0x0F);
+
+	// Store the current time, so the same is used for every button.
+	uint32_t _mp_tTime = millis();
+	bool change = false;
+
+//	ml_setLed(~_mp_now);
+
+//	ml_setLed(0);
+
+	// Debounce each button.
+	for(uint8_t i = 0; i < 16; ++i){
+		// Bit of each button is kept for instant previous and present state,
+		// and for current active state.
+		bool prev = _mp_prev & _BV(i);
+		bool now = _mp_now & _BV(i);
+		bool state = _mp_state & _BV(i);
+		bool pState = _mp_pState & _BV(i);
+
+		// If there is a difference between instant previous read and current one,
+		// then init the counter. 
+
+		if(prev != now){
+			_mp_time[i] = _mp_tTime;
+//			ml_setLed(i, true);
+		}
+
+		// If the delay of this button is more than debounce delay since last change, 
+		// we update the current active value.
+		if((now != pState) && ((_mp_tTime - _mp_time[i]) > _mp_debounceDelay)){
+//			ml_setLed(i, ~now);
+			// Copy the previous state.
+			_mp_pState = _mp_state;
+			uint16_t tempState = _mp_pState;
+			// Replace the right bit by the new value. We use a temp value to avoid problems with
+			// interrupts firing during reading.
+			tempState &= ~_BV(i);
+			tempState |= (_mp_now & _BV(i));
+
+			// Then we update the global value.
+			uint8_t sreg = SREG;
+			cli();
+			_mp_state = tempState;
+			SREG = sreg;
+
+			// And set a flag for return value.
+			change = true;
+		}
 	}
 
-	if((_mp_state != _mp_now) && ((millis() - _mp_time) > _mp_debounceDelay)){
-		_mp_pState = _mp_state;
-		_mp_state = _mp_now;
-//		_mp_int = true;
-		return true;
-	}
-	return false;
+//	ml_update();
+	return change;
 }

@@ -84,31 +84,38 @@ uint8_t twiAddress = baseAddress;
 // TWI init function.
 void mw_init(){
     // Setting address pins
-    // PB0: addr0: input pullup
-    // PB1: addr1: input pullup
-    // PB2: addr2: input pullup
-    // PD0: addr3: input pullup
-    // PD1: addr4: input pullup
+    // PD4: addr0: input pullup
+    // PD5: addr1: input pullup
+    // PD6: addr2: input pullup
+    // PD7: addr3: input pullup
+    // PB0: addr4: input pullup
 
-    DDRB &= ~(0x00);
-    PORTB |= 0x07;
+    DDRB &= ~(0x01);
+    PORTB |= 0x01;
 
-    DDRD &= ~(0x00);
-    PORTD |= 0x03;
+    DDRD &= ~(0xF0);
+    PORTD |= 0xF0;
 
-    //setting the TWI address of the board, using the five address jumpers.
+    delay(1);
+
+    // Setting the TWI address of the board, using the five address jumpers.
     uint8_t twiOffset = 0;
-    twiOffset |= (bit_is_clear(PINB, 0) << 0);
-    twiOffset |= (bit_is_clear(PINB, 1) << 1);
-    twiOffset |= (bit_is_clear(PINB, 2) << 2);
-    twiOffset |= (bit_is_clear(PIND, 0) << 3);
-    twiOffset |= (bit_is_clear(PIND, 1) << 4);
+    twiOffset |= (bit_is_clear(PIND, 4) << 0);
+    twiOffset |= (bit_is_clear(PIND, 5) << 1);
+    twiOffset |= (bit_is_clear(PIND, 6) << 2);
+    twiOffset |= (bit_is_clear(PIND, 7) << 3);
+    twiOffset |= (bit_is_clear(PINB, 0) << 4);
 
+    // Set the address ports back as high-Z so they don't draw current.
+    PORTB &= ~0x01;
+    PORTD &= ~0xF0;
+
+    // Add the jumper offset to the device address.
     twiAddress = baseAddress + twiOffset;
 
     Wire.begin(twiAddress);
 
-    // Enable general call recognition, for broadcast adressing.
+    // Enable general call recognition, for broadcast adressing with address 0.
     TWAR |= _BV(TWGCE);
 
     Wire.onReceive(mw_receiveHandler);
@@ -161,12 +168,12 @@ void mw_receiveHandler(int bytes){
 		}
 	}
 
-	 if(((command ^ GET_BUTTONS) & 0xF0) == 0){
+	if(((command ^ GET_BUTTONS) & 0xF0) == 0){
 	 	_mw_twiState = TWI_SEND_BUTTONS;
 
 	} else if((command ^ LED_STATE) == 0){
-		uint8_t data = (uint16_t)(Wire.read() << 8);
-		data |= (uint16_t)Wire.read();
+		uint16_t data = ((uint16_t)Wire.read() << 8);
+		data |= Wire.read();
 		ml_setLed(data);
 
 	} else if(((command ^ DISPLAY_STATE) & 0xF0) == 0){
@@ -177,14 +184,14 @@ void mw_receiveHandler(int bytes){
 
 	} else if((command ^ BLINK_ON_DELAY) == 0){
 		uint16_t delay = 0;
-		delay |= (uint16_t)(Wire.read() << 8);
-		delay |= (uint16_t)(Wire.read());
+		delay |= ((uint16_t)Wire.read() << 8);
+		delay |= (Wire.read());
 		ml_setBlinkOnDelay(delay);
 
 	} else if((command ^ BLINK_OFF_DELAY) == 0){
 		uint16_t delay = 0;
-		delay |= (uint16_t)(Wire.read() << 8);
-		delay |= (uint16_t)(Wire.read());
+		delay |= ((uint16_t)Wire.read() << 8);
+		delay |= (Wire.read());
 		ml_setBlinkOffDelay(delay);
 		
 	} else if((command ^ DEBOUNCE_DELAY) == 0){
@@ -207,14 +214,20 @@ void mw_receiveHandler(int bytes){
 
 }
 
+// Request handler.
 void mw_requestHandler(){
 
 	uint16_t buttons = 0;
 	switch (_mw_twiState){
-		case TWI_SEND_BUTTON:
+		case TWI_SEND_BUTTONS:
+			// Get a reading from buttons
 			buttons = mp_getButtons();
-			Wire.write((uint8_t)(buttons >> 8));
-			Wire.write((uint8_t)buttons);
+			// Wire implementation causes only one write() can be made per request,
+			// so a buffer is set to send both bytes (int16 cut in two) at once. 
+			uint8_t but[2];
+			but[0] = (uint8_t)(buttons >> 8);
+			but[1] = (uint8_t)(buttons & 0xFF);
+			Wire.write(but, 2);
 			_mw_twiState = TWI_SEND_IDLE;
 			break;
 /*		case TWI_SEND_INT:

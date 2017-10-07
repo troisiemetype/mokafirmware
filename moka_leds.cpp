@@ -58,8 +58,8 @@ uint16_t _ml_blinkOffDelay = 1000;
 void ml_init(){
     //Set the led data pin, output, default to 0;
 
-    DDRD |= _BV(DDD3);
-    PORTD &= ~(_BV(PORTD3));   
+    DDRB |= _BV(DDB1);
+    PORTB &= ~(_BV(PORTB1));
 
     ml_clrLeds(); 
     ml_setDisplayState(true);
@@ -119,8 +119,8 @@ void ml_update(){
 	uint8_t curByte = *ptr;
 
 	// Value for turning deicated port pin high or low.
-	uint8_t hi = PORTD | _BV(PORTD3);
-	uint8_t lo = PORTD & ~_BV(PORTD3);
+	uint8_t hi = PORTB | _BV(PORTB1);
+	uint8_t lo = PORTB & ~_BV(PORTB1);
 
 	// Counters for total byte number, and for each bit in these bytes.
 	uint8_t counter = 0;
@@ -151,7 +151,7 @@ void ml_update(){
 			[curByte]	"+r"	(curByte)
 		:	[lo]		"r"		(lo),
 			[hi]		"r"		(hi),
-			[port]		"I"		(_SFR_IO_ADDR(PORTD)),
+			[port]		"I"		(_SFR_IO_ADDR(PORTB)),
 			[ptr]		"e"		(ptr)
 	);
 

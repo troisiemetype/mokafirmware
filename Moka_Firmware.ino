@@ -70,96 +70,74 @@
 #include "moka_twi.h"
 
 //Constants definition
-const uint8_t nbLed = 16;
+//const uint8_t nbLed = 16;
 
-const uint8_t dataPin = 3;
-
+/*
 uint8_t rColor = 1;
 uint8_t gColor = 1;
 uint8_t bColor = 1;
+*/
+uint8_t color = 0b01110100;
 
-uint8_t color = 0b00000000;
 
 void setup(){
     //Setting up the pins
-/*
-    DDRB = 0x00;            //All port B pins are input
-    PORTB = 0x07;           //PB0, PB1 and PB2 with pullup
 
-    DDRC = 0x0F;            //PC0 - PC3 are Output, PC4 - PC6 are input.
-    PORTC = 0x0F;           //PC0 - PC3 are HIGH, PC4 - PC6 with no pullup.
-
-    //DDRD = 0b00001100;
-    DDRD = 0x0C;
-    //PORTD = 0b11110011;
-    PORTD = 0xF3;
-    */
 
     ml_init();
 
+    for(uint8_t i = 0; i < 16; ++i){
+        ml_setColor(i, color);
+    }
+/*
+    for(uint8_t i = 0; i < 16; ++i){
+        ml_setLed(i, true);
+        ml_update();
+        delay(20);
+    }
+
+    ml_update();
+
+    delay(500);
+
+    for(uint8_t i = 0; i < 16; ++i){
+        ml_setLed(i, false);
+        ml_update();
+        delay(20);
+    }
+
+    ml_update();
+*/
     //Pad setting
     mp_init();
 
     mw_init();
 
-    //Led init
-    randomSeed(3224);
-
-//    pad.begin();
 }
 
 void loop(){
-    
+//    test();
+    mp_update();
+//    ml_update();
+}
+
+//Test function
+void test(){
     if(mp_update()){
-
+        
         uint16_t buttonState = mp_getButtons();
-
-        for(uint8_t i = 0; i < nbLed; i++){
-            if((buttonState & _BV(i)) == _BV(i)){
+        for(uint8_t i = 0; i < 16; i++){
+            
+            if(buttonState & _BV(i)){
                 ml_setLed(i, true);
-                ml_setColor(i, random(256));
-//                pad.setPixelColor(i, random(256), random(256), random(256));
+                ml_setColor(i, color);
             } else {
                 ml_setLed(i, false);
-//                pad.setPixelColor(i, 0, 0, 0);
             }
+            
             ml_update();
-
-
-
-      }
-  }
-
-/*
-    for(uint8_t i = 0; i < nbLed; i++){
-        pad.setPixelColor(i, random(256), random(256), random(256));
-    }
-    pad.show();
-    delay(250);
-*/
-/*
-    rColor *= 2;
-    if(rColor >= 128){
-        rColor = 1;
-        gColor *= 2;
-        if(gColor >= 128){
-            gColor = 1;
-            bColor *= 2;
-            if(bColor >= 128) bColor = 1;
         }
-
+     
     }
-*/    
-
+    delay(10);
 }
-/*
-//Test function
-void testRandomLed(){
-    for (uint8_t i = 0; i < 16; i++){
-        ml_setColor(i, random(256), random(256), random(256));
-    }
-    ml_update();
-
-    delay(1000);
-}
-*/

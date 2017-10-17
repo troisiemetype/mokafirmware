@@ -40,6 +40,21 @@ const uint16_t NUM_LED = 16;
 //The table storing the current led color.
 uint8_t _ml_ledColor[NUM_LED][3];
 uint8_t _ml_ledData[NUM_LED][3];
+uint8_t _ml_ledBrightTable[13] = {
+	0,
+	9,
+	17,
+	26,
+	35,
+	46,
+	57,
+	70,
+	87,
+	109,
+	140,
+	183,
+	248	
+};
 
 //Led state, i.e. on or off: one bit per led
 uint16_t _ml_ledState = 0;
@@ -74,9 +89,19 @@ void ml_setColor(uint8_t ledId, uint8_t color){
 	uint8_t rChannel = (color >> 4) & 0x03;
 	uint8_t gChannel = (color >> 2) & 0x03;
 	uint8_t bChannel = (color >> 0) & 0x03;
+/*
 	rChannel *= aChannel * 21;
 	gChannel *= aChannel * 21;
 	bChannel *= aChannel * 21;
+*/
+	rChannel *= aChannel;
+	gChannel *= aChannel;
+	bChannel *= aChannel;
+
+	rChannel = _ml_ledBrightTable[rChannel];
+	gChannel = _ml_ledBrightTable[gChannel];
+	bChannel = _ml_ledBrightTable[bChannel];
+
 	ml_setColor(ledId, rChannel, gChannel, bChannel);
 
 }

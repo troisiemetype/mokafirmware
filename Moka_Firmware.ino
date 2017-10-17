@@ -77,7 +77,7 @@ uint8_t rColor = 1;
 uint8_t gColor = 1;
 uint8_t bColor = 1;
 */
-uint8_t color = 0b01110100;
+uint8_t color = 0b10111111;
 
 
 void setup(){
@@ -126,18 +126,27 @@ void test(){
     if(mp_update()){
         
         uint16_t buttonState = mp_getButtons();
-        for(uint8_t i = 0; i < 16; i++){
-            
-            if(buttonState & _BV(i)){
+        for(uint8_t i = 0; i < 16; ++i){
+
+            if((buttonState & _BV(i))){
+
+                uint8_t tempColor = 3 - (i / 4);
+                uint8_t rank = 2 * (3 - (i % 4));
+                color &= ~(0x3 << rank);
+                color |= tempColor << rank;
                 ml_setLed(i, true);
-                ml_setColor(i, color);
             } else {
                 ml_setLed(i, false);
             }
-            
-            ml_update();
+        }
+
+        for(uint8_t i = 0; i < 16; ++i){
+            ml_setColor(i, color);
         }
      
     }
+
+    ml_update();
+
     delay(10);
 }

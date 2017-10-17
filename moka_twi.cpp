@@ -115,7 +115,7 @@ void mw_init(){
 
     Wire.begin(twiAddress);
 
-    // Enable general call recognition, for broadcast adressing with address 0.
+    // Enable general call recognition, for broadcast addressing with address 0.
     TWAR |= _BV(TWGCE);
 
     Wire.onReceive(mw_receiveHandler);

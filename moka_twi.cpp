@@ -125,17 +125,21 @@ void mw_init(){
 void mw_receiveHandler(int bytes){
 	uint8_t command = Wire.read();
 
+	// Receveing data for led color in 1 byte mode.
 	if(_mw_colorMode == COLOR_MODE_8){
+		// Set one led with a color. Read one incomming byte.
 		if(((command ^ SET_ONE_LED) & 0xF0) == 0){
 			uint8_t value = Wire.read();
 			ml_setColor(command & 0x0F, value);
 
+		// Set all led with a color. Read one incomming byte and apply it to all leds.
 		} else if(((command ^ SET_GLOBAL_LED) & 0xF0) == 0){
 			uint8_t value = Wire.read();
 			for(uint8_t i = 0; i < 16; i++){
 				ml_setColor(i, value);				
 			}
 
+		// Set all led with a color for each. Read one incomming byte per led.
 		} else if(((command ^ SET_ALL_LED) & 0xF0) == 0){
 			for(uint8_t i = 0; i < 16; i++){
 				uint8_t value = Wire.read();
@@ -143,13 +147,16 @@ void mw_receiveHandler(int bytes){
 			}
 		}
 
+	// Receveing data for led color in 3 bytes mode.
 	} else if (_mw_colorMode == COLOR_MODE_24){
+		// Set one led with a color. Read three incomming bytes for R, G and B.
 		if(((command ^ SET_ONE_LED) & 0xF0) == 0){
 			uint8_t rValue = Wire.read();
 			uint8_t gValue = Wire.read();
 			uint8_t bValue = Wire.read();
 			ml_setColor(command & 0x0F, rValue, gValue, bValue);
 
+		// Set all led. Read three incomming bytes for R, G, B; apply them to all leds.
 		} else if(((command ^ SET_GLOBAL_LED) & 0xF0) == 0){
 			uint8_t rValue = Wire.read();
 			uint8_t gValue = Wire.read();
@@ -158,6 +165,8 @@ void mw_receiveHandler(int bytes){
 				ml_setColor(i, rValue, gValue, bValue);				
 			}
 
+		// Set all led. Read three incomming bytes per led for R, G, B.
+		// NOTA: doesn't work, has default TWI buffer is two small (32 bytes) for as much data.
 		} else if(((command ^ SET_ALL_LED) & 0xF0) == 0){
 			for(uint8_t i = 0; i < 16; i++){
 				uint8_t rValue = Wire.read();
@@ -168,46 +177,59 @@ void mw_receiveHandler(int bytes){
 		}
 	}
 
+	// Request last button read. Subsequent sent is managed by mw_requestHandler.
 	if(((command ^ GET_BUTTONS) & 0xF0) == 0){
 	 	_mw_twiState = TWI_SEND_BUTTONS;
 
+	// Update led state. Read two incomming bytes, each bit beeing a led state.
 	} else if((command ^ LED_STATE) == 0){
 		uint16_t data = ((uint16_t)Wire.read() << 8);
 		data |= Wire.read();
 		ml_setLed(data);
 
+	// Turn display on or off. State is the LSB of the command byte received.
 	} else if(((command ^ DISPLAY_STATE) & 0xF0) == 0){
 		ml_setDisplayState((bool)(command & 0x01));
 
+	// Turn blink on/off. State is the LSB of the command byte received.
 	} else if(((command ^ BLINK_STATE) & 0xF0) == 0){
 		ml_setBlinkState((bool)(command & 0x01));
 
+	// Blink on delay. Read two incomming bytes for delay in milliseconds.
 	} else if((command ^ BLINK_ON_DELAY) == 0){
 		uint16_t delay = 0;
 		delay |= ((uint16_t)Wire.read() << 8);
 		delay |= (Wire.read());
 		ml_setBlinkOnDelay(delay);
 
+	// Blink off delay. Read two incomming bytes for delay in milliseconds.
 	} else if((command ^ BLINK_OFF_DELAY) == 0){
 		uint16_t delay = 0;
 		delay |= ((uint16_t)Wire.read() << 8);
 		delay |= (Wire.read());
 		ml_setBlinkOffDelay(delay);
 		
+	// Set debounce delay. Read on incomming byte for delay in milliseconds.
 	} else if((command ^ DEBOUNCE_DELAY) == 0){
 		uint8_t delay = Wire.read();
 		mp_setDebounceDelay(delay);
 
+	// Request int confirmation. Subsequent sent is managed by mw_requestHandler.
+	// NOTA: due to hardware design (error), it cannot be implemented yet.
 	} else if((command ^ HAS_CHANGED) == 0){
 		_mw_twiState = TWI_SEND_INT;
 
-		// TODO: see if it work like that, or if it will have to be changed.
+	// TODO: see if it work like that, or if it will have to be changed.
+	// Set color mode. Switch between 1 or 3 byte color mode.
 	} else if(((command ^ COLOR_MODE) & 0xFE) == 0){
 		_mw_colorMode = (command & 0x01);
+	// Clear display.
 	} else if((command ^ CLR_DISPLAY) == 0){
 		ml_clrLeds();
+	// Update leds: apply the last led data to display. Effectively update display.
 	} else if((command ^ UPDATE_LEDS) == 0){
 		ml_update();
+	// Reset the board. Not implemented yet.
 	} else if((command ^ RESET) == 0){
 		//reset boad
 	}
